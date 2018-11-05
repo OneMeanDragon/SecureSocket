@@ -7,7 +7,6 @@ DWORD SecureSocket::SocketProcess(LPVOID param) { //(WorkerThread)
 	while (mSocket->m_connected != FALSE)
 	{
 		//EventID = WaitForSingleObject(mSocket->events[0], INFINITE);
-		//how do i send this function to/on the parent thread
 		//mSocket->SocketAPCProcess(param, EventID);
 	}
 
