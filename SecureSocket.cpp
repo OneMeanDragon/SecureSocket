@@ -82,3 +82,37 @@ void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_p
 		//Connected(); //TODO: Event
 	}
 }
+
+void SecureSocket::PerformHandshake(void)
+{
+	OutBuffers[0].pvBuffer = 0;
+	OutBuffers[0].BufferType = SECBUFFER_TOKEN;
+	OutBuffers[0].cbBuffer = 0;
+
+	OutBuffer.cBuffers = 1;
+	OutBuffer.pBuffers = OutBuffers;
+	OutBuffer.ulVersion = SECBUFFER_VERSION;
+
+	SECURITY_STATUS scRet = schannel->InitializeSecurityContextA(
+		&m_cc,
+		0,
+		(SEC_CHAR *)ServerSecAddress.c_str(),
+		sspiflags,
+		0,
+		SECURITY_NATIVE_DREP,
+		0,
+		0,
+		&contexthandle,
+		&OutBuffer,
+		&sspioutflags,
+		0
+	);
+	if (scRet != SEC_I_CONTINUE_NEEDED)
+		MessageBox(0, "Error Initializing Security Context", "Message", MB_TASKMODAL | MB_OK);
+	else
+		MessageBox(0, "Security Context Initialized", "Message", MB_TASKMODAL | MB_OK);
+
+
+	MessageBox(0, "Done", "Message", MB_TASKMODAL | MB_OK);
+
+}
