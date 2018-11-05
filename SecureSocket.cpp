@@ -31,7 +31,14 @@ void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_p
 		closesocket(this->mySocket); 
 		this->m_connected = FALSE; 
 		this->mySocket = INVALID_SOCKET; 
+		//Re initalize the secure bits
+		//
+
+		//Or just return a message saying were already connected, force them to disconnect.
+		//this->Error("We are already connected, try disconnecting first.", false); //TODO: Event
+		//return;
 	}
+
 
 	ServerAddress = serv;
 	ServerSecAddress = sec_serv;
