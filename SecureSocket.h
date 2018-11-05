@@ -33,6 +33,14 @@ private:
 	SCHANNEL_CRED m_scc;
 	CredHandle m_cc;
 
+	DWORD sspiflags = (ISC_REQ_SEQUENCE_DETECT|ISC_REQ_REPLAY_DETECT|ISC_REQ_CONFIDENTIALITY|ISC_RET_EXTENDED_ERROR|ISC_REQ_ALLOCATE_MEMORY|ISC_REQ_STREAM);
+	DWORD sspioutflags; 
+	SecBuffer OutBuffers[1];
+	SecBufferDesc OutBuffer;
+	CtxtHandle contexthandle;
+	PSecurityFunctionTable schannel;
+
+
 	void SetupSchannelCredentials(UINT32 protocol, SCHANNEL_CRED &schannelcredentials);
 
 public: 
@@ -46,7 +54,7 @@ public:
 		securitydllmodule = LoadLibrary("Secur32.dll");
 		// Initialize Schannel
 		INIT_SECURITY_INTERFACE initsecurtyinterfacefunction = (INIT_SECURITY_INTERFACE)GetProcAddress(securitydllmodule, "InitSecurityInterfaceA");
-		PSecurityFunctionTable schannel = initsecurtyinterfacefunction();
+		schannel = initsecurtyinterfacefunction();
 		if (!schannel) {
 			MessageBox(0, "Failed to initialize schannel", "Message", MB_TASKMODAL | MB_OK);
 			//clean up?
@@ -80,5 +88,6 @@ public:
 		securitydllmodule = NULL;
 	}
 	
-	void Connect(std::string serv, std::string sec_serv, UINT16 serv_port) ;
+	void Connect(std::string serv, std::string sec_serv, UINT16 serv_port);
+	void PerformHandshake(void);
 };
