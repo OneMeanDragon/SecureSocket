@@ -127,7 +127,7 @@ public:
 		mod_security = NULL;
 	}
 	
-	BOOL LoadSecurityModule(void);
+	bool1 LoadSecurityModule(void);
 	void Connect(std::string serv, std::string sec_serv, UINT16 serv_port);
 	void PerformHandshake(void);
 	void StartSocketThread(void);
