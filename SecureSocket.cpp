@@ -13,7 +13,7 @@ DWORD SecureSocket::SocketProcess(LPVOID param) { //(WorkerThread)
 	return 0;
 }
 
-BOOL getSysOpType(OSVERSIONINFOEX &osInfo)
+BOOL getSysVersionInfo(OSVERSIONINFOEX &osInfo)
 {
 	NTSTATUS(WINAPI *RtlGetVersion)(LPOSVERSIONINFOEX);
 
@@ -34,7 +34,7 @@ bool SecureSocket::LoadSecurityModule(void)
 	//  QUERY_CREDENTIALS_ATTRIBUTES_FN pQueryCredentialsAttributes;
 	OSVERSIONINFOEX VerInfo;
 	char lpszDLL[MAX_PATH];
-	if (!getSysOpType(VerInfo))
+	if (!getSysVersionInfo(VerInfo))
 	{
 		this->ErrorMessage("Could not retrieve OS Version info. ", true);
 		return false;
@@ -43,7 +43,7 @@ bool SecureSocket::LoadSecurityModule(void)
 	//  Find out which security DLL to use, depending on
 	//  whether we are on Win2K, NT or Win9x
 	//VerInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
-	//if (!GetVersionEx(&VerInfo)) return FALSE;
+	//if (!GetVersionEx(&VerInfo)) return FALSE; <----------- Depreciated
 
 
 	if (VerInfo.dwPlatformId == VER_PLATFORM_WIN32_NT && VerInfo.dwMajorVersion == 4)
