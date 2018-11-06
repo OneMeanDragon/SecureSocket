@@ -39,7 +39,6 @@ void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_p
 		//return;
 	}
 
-
 	ServerAddress = serv;
 	ServerSecAddress = sec_serv;
 	port = serv_port;
@@ -81,30 +80,31 @@ void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_p
 		time(&this->m_connecteddate);
 		//Connected(); //TODO: Event
 	}
+	PerformHandshake();
 }
 
 void SecureSocket::PerformHandshake(void)
 {
-	OutBuffers[0].pvBuffer = 0;
-	OutBuffers[0].BufferType = SECBUFFER_TOKEN;
-	OutBuffers[0].cbBuffer = 0;
+	SChanDat.OutBuffers[0].pvBuffer = 0;
+	SChanDat.OutBuffers[0].BufferType = SECBUFFER_TOKEN;
+	SChanDat.OutBuffers[0].cbBuffer = 0;
 
-	OutBuffer.cBuffers = 1;
-	OutBuffer.pBuffers = OutBuffers;
-	OutBuffer.ulVersion = SECBUFFER_VERSION;
+	SChanDat.OutBuffer.cBuffers = 1;
+	SChanDat.OutBuffer.pBuffers = SChanDat.OutBuffers;
+	SChanDat.OutBuffer.ulVersion = SECBUFFER_VERSION;
 
-	SECURITY_STATUS scRet = schannel->InitializeSecurityContextA(
-		&m_cc,
+	SECURITY_STATUS scRet = SChanDat.schannel->InitializeSecurityContextA(
+		&SChanDat.m_cc,
 		0,
 		(SEC_CHAR *)ServerSecAddress.c_str(),
-		sspiflags,
+		SChanDat.sspiflags,
 		0,
 		SECURITY_NATIVE_DREP,
 		0,
 		0,
-		&contexthandle,
-		&OutBuffer,
-		&sspioutflags,
+		&SChanDat.contexthandle,
+		&SChanDat.OutBuffer,
+		&SChanDat.sspioutflags,
 		0
 	);
 	if (scRet != SEC_I_CONTINUE_NEEDED)
