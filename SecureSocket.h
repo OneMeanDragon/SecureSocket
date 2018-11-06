@@ -29,6 +29,10 @@ struct SocketDat {
 	SOCKET mySocket = INVALID_SOCKET;
 	BOOL m_connected = FALSE;
 	struct addrinfo *result, *ptr, hints;
+	HANDLE events[2];
+	UINT64 m_bytesout, m_bytesin = 0;
+	HANDLE WorkerThread;
+	UINT32 m_STATE;
 };
 
 class SecureSocket
@@ -40,9 +44,6 @@ private:
 
 	time_t m_connecteddate = NULL;
 
-	//Socket Infos
-	SocketDat SckDat;
-
 	//SChannel Infos
 	HMODULE mod_security = NULL;
 	SChannelData SChanDat;
@@ -50,8 +51,34 @@ private:
 	void SetupSchannelCredentials(UINT32 protocol, SCHANNEL_CRED &schannelcredentials);
 
 public: 
-	static DWORD WINAPI SocketProcess(LPVOID param);
+	//Socket Infos
+	SocketDat SckDat; //Public for the thread
 
+	static DWORD WINAPI SocketProcess(LPVOID param);
+	void CALLBACK SocketAPCProcess(LPVOID param, const DWORD dwEventID);
+
+	//Events
+	void ErrorMessage(std::string error_message, bool crit_error);
+	void InfoMessage(std::string info_message);
+	void DataArrivalMessage(char *buffer, int Length);
+	void DisconnectMessage(void);
+
+	typedef void(*_Disconnected)(std::string from_address, u_short on_port);
+	typedef void(*_DataArrival)(char *buffer, int length);
+	typedef void(*_Error)(std::string message);
+	typedef void(*_Connecting)(std::string host_address, u_short port);
+	typedef void(*_InfoMessage)(std::string message);
+	typedef void(*_Connected)(std::string host_address, u_short port);
+	typedef void(*_SecureSocketFinalized)(void);
+	struct _FunctionPointers {
+		_Connected Connected;
+		_Disconnected Disconnected;
+		_DataArrival DataArrival;
+		_Error Error;
+		_Connecting Connecting;
+		_InfoMessage Info;
+		_SecureSocketFinalized SecuredSocket;
+	} _events;
 	
 	SecureSocket()
 	{
@@ -62,10 +89,10 @@ public:
 		INIT_SECURITY_INTERFACE initsecurtyinterfacefunction = (INIT_SECURITY_INTERFACE)GetProcAddress(mod_security, "InitSecurityInterfaceA");
 		SChanDat.schannel = initsecurtyinterfacefunction();
 		if (!SChanDat.schannel) {
-			MessageBox(0, "Failed to initialize schannel", "Message", MB_TASKMODAL | MB_OK);
-			//clean up?
+			this->ErrorMessage("Failed to initialize schannel. ", true); 
+			return;
 		} else {
-			MessageBox(0, "initialized schannel", "Message", MB_TASKMODAL | MB_OK);
+			this->InfoMessage("initialized schannel. ");
 		}
 		// Setup Schannel Credentials
 		ZeroMemory(&SChanDat.m_scc, sizeof(SChanDat.m_scc));
@@ -82,13 +109,22 @@ public:
 			&SChanDat.m_cc,
 			0
 		);
-		if (securitystatus != SEC_E_OK)
-			MessageBox(0, "Failed to get credenetials", "Message", MB_TASKMODAL | MB_OK);
-		else
-			MessageBox(0, "Got client credenetials", "Message", MB_TASKMODAL | MB_OK);
+		if (securitystatus != SEC_E_OK) {
+			this->ErrorMessage("Failed to get credenetials. ", true);
+			return;
+		} else {
+			this->InfoMessage("Got client credenetials. "); 
+		}
+		//DataArrival worker
+		SckDat.WorkerThread = CreateThread(NULL, 0, SocketProcess, (LPVOID)this, CREATE_SUSPENDED, NULL);
 	}
 	~SecureSocket()
 	{
+		//unload the socket thread
+		SckDat.m_connected = false;
+		ResumeThread(SckDat.WorkerThread);
+		WaitForSingleObject(SckDat.WorkerThread, INFINITE);
+		CloseHandle(SckDat.WorkerThread);
 		//free the library
 		FreeLibrary(mod_security);
 		mod_security = NULL;
@@ -96,6 +132,7 @@ public:
 	
 	void Connect(std::string serv, std::string sec_serv, UINT16 serv_port);
 	void PerformHandshake(void);
+	void StartSocketThread(void);
 
 	//EncryptSend
 	//Recieve
