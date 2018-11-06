@@ -4,7 +4,7 @@ DWORD SecureSocket::SocketProcess(LPVOID param) { //(WorkerThread)
 	SecureSocket *mSocket = reinterpret_cast<SecureSocket*>(param);
 	DWORD EventID;
 
-	while (mSocket->m_connected != FALSE)
+	while (mSocket->SckDat.m_connected != FALSE)
 	{
 		//EventID = WaitForSingleObject(mSocket->events[0], INFINITE);
 		//mSocket->SocketAPCProcess(param, EventID);
@@ -24,13 +24,13 @@ void SecureSocket::SetupSchannelCredentials(UINT32 protocol, SCHANNEL_CRED &scha
 void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_port)
 {
 	//are we trying to connect an already open socket?
-	if (this->mySocket != INVALID_SOCKET) { 
+	if (this->SckDat.mySocket != INVALID_SOCKET) {
 		//clean up secure bits...
 		//
 		//clean up old socket
-		closesocket(this->mySocket); 
-		this->m_connected = FALSE; 
-		this->mySocket = INVALID_SOCKET; 
+		closesocket(this->SckDat.mySocket);
+		this->SckDat.m_connected = FALSE;
+		this->SckDat.mySocket = INVALID_SOCKET;
 		//Re initalize the secure bits
 		//
 
@@ -43,40 +43,40 @@ void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_p
 	ServerSecAddress = sec_serv;
 	port = serv_port;
 
-	int iResult = getaddrinfo(this->ServerAddress.c_str(), std::to_string(this->port).c_str(), &hints, &result);
+	int iResult = getaddrinfo(this->ServerAddress.c_str(), std::to_string(this->port).c_str(), &SckDat.hints, &SckDat.result);
 	if (iResult != 0) { 
 		//this->Error("getaddrinfo failed.", true); //TODO: Event
 		return; 
 	}
-	ptr = result;
-	for (ptr = result; ptr != NULL; ptr = ptr->ai_next)
+	SckDat.ptr = SckDat.result;
+	for (SckDat.ptr = SckDat.result; SckDat.ptr != NULL; SckDat.ptr = SckDat.ptr->ai_next)
 	{
 		//this->AttemptingConnectionTo(ptr); //TODO: Event
 
-		this->mySocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-		if (this->mySocket == INVALID_SOCKET) {
+		this->SckDat.mySocket = socket(SckDat.ptr->ai_family, SckDat.ptr->ai_socktype, SckDat.ptr->ai_protocol);
+		if (this->SckDat.mySocket == INVALID_SOCKET) {
 			continue;
 		}
-		iResult = connect(this->mySocket, ptr->ai_addr, (int)(ptr->ai_addrlen));
+		iResult = connect(this->SckDat.mySocket, SckDat.ptr->ai_addr, (int)(SckDat.ptr->ai_addrlen));
 		if (iResult != SOCKET_ERROR)
 		{
 			break; //break the for loop were connected
 		}
 		else {
-			closesocket(this->mySocket);
-			this->mySocket = INVALID_SOCKET;
+			closesocket(this->SckDat.mySocket);
+			this->SckDat.mySocket = INVALID_SOCKET;
 		}
 	}
-	freeaddrinfo(result);
+	freeaddrinfo(SckDat.result);
 
-	if (this->mySocket == INVALID_SOCKET)
+	if (this->SckDat.mySocket == INVALID_SOCKET)
 	{
 		//connection failed
 		//this->Error("Server connection Failed!", true); //TODO: Event
 	}
 	else {
 		//we connected
-		this->m_connected = true;
+		this->SckDat.m_connected = true;
 		time(&this->m_connecteddate);
 		//Connected(); //TODO: Event
 	}
