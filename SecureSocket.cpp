@@ -6,8 +6,8 @@ DWORD SecureSocket::SocketProcess(LPVOID param) { //(WorkerThread)
 
 	while (mSocket->SckDat.m_connected != FALSE)
 	{
-		//EventID = WaitForSingleObject(mSocket->events[0], INFINITE);
-		//mSocket->SocketAPCProcess(param, EventID);
+		EventID = WaitForSingleObject(mSocket->SckDat.events[0], INFINITE);
+		mSocket->SocketAPCProcess(param, EventID);
 	}
 
 	return 0;
@@ -28,15 +28,15 @@ void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_p
 		//clean up secure bits...
 		//
 		//clean up old socket
-		closesocket(this->SckDat.mySocket);
-		this->SckDat.m_connected = FALSE;
-		this->SckDat.mySocket = INVALID_SOCKET;
+		//closesocket(this->SckDat.mySocket);
+		//this->SckDat.m_connected = FALSE;
+		//this->SckDat.mySocket = INVALID_SOCKET;
 		//Re initalize the secure bits
 		//
 
 		//Or just return a message saying were already connected, force them to disconnect.
-		//this->Error("We are already connected, try disconnecting first.", false); //TODO: Event
-		//return;
+		this->ErrorMessage("We are already connected, try disconnecting first. ", false);
+		return;
 	}
 
 	ServerAddress = serv;
@@ -45,7 +45,7 @@ void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_p
 
 	int iResult = getaddrinfo(this->ServerAddress.c_str(), std::to_string(this->port).c_str(), &SckDat.hints, &SckDat.result);
 	if (iResult != 0) { 
-		//this->Error("getaddrinfo failed.", true); //TODO: Event
+		this->ErrorMessage("getaddrinfo failed. ", true);
 		return; 
 	}
 	SckDat.ptr = SckDat.result;
@@ -72,13 +72,13 @@ void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_p
 	if (this->SckDat.mySocket == INVALID_SOCKET)
 	{
 		//connection failed
-		//this->Error("Server connection Failed!", true); //TODO: Event
+		this->ErrorMessage("Server connection Failed! ", true);
+		return; //We simply couldent connect the socket, criticalerror out and return.
 	}
 	else {
 		//we connected
 		this->SckDat.m_connected = true;
 		time(&this->m_connecteddate);
-		//Connected(); //TODO: Event
 	}
 	PerformHandshake();
 }
@@ -107,12 +107,157 @@ void SecureSocket::PerformHandshake(void)
 		&SChanDat.sspioutflags,
 		0
 	);
-	if (scRet != SEC_I_CONTINUE_NEEDED)
-		MessageBox(0, "Error Initializing Security Context", "Message", MB_TASKMODAL | MB_OK);
-	else
-		MessageBox(0, "Security Context Initialized", "Message", MB_TASKMODAL | MB_OK);
+	if (scRet != SEC_I_CONTINUE_NEEDED) {
+		this->ErrorMessage("Error Initializing Security Context. ", true);
+		return;
+	} else {
+		this->InfoMessage("Security Context Initialized. ");
+	}
+
+	//need to do the handshake loop before this
+	this->InfoMessage("Starting up WorkerThread. ");
+	this->StartSocketThread();
+}
+
+void SecureSocket::StartSocketThread(void)
+{
+	this->SckDat.events[0] = CreateEvent(0, 0, 0, 0);
+	WSAResetEvent(this->SckDat.events[0]);
+	WSAEventSelect(this->SckDat.mySocket, this->SckDat.events[0], 0);
+	WSAEventSelect(this->SckDat.mySocket, this->SckDat.events[0], FD_READ | FD_CLOSE);
+
+	//clean the worker
+	if (this->SckDat.WorkerThread != NULL) {
+		CloseHandle(this->SckDat.WorkerThread);
+		this->SckDat.WorkerThread = CreateThread(NULL, 0, SocketProcess, (LPVOID)this, CREATE_SUSPENDED, NULL);
+	}
+
+	ResumeThread(SckDat.WorkerThread); //	###TODO### FixMe --^
+
+	//raise connected event
+	//this->Connected(); //TODO: Event
+}
+
+void CALLBACK SecureSocket::SocketAPCProcess(LPVOID param, const DWORD dwEventID)
+{
+	OutputDebugString("EVENTS: INVISABLE\r\n");
+	SecureSocket *refSocket = reinterpret_cast<SecureSocket*>(param);
+
+	//process by events
+	if (!IsBadReadPtr((VOID*)refSocket, sizeof(refSocket))) {
+
+		//refSocket->CriticalSection.enter();
+
+		switch (dwEventID)
+		{
+		case WAIT_TIMEOUT: {
+			break;
+		}
+		case WAIT_FAILED: {
+			refSocket->ErrorMessage("(WaitForSingleObject)", false);
+			refSocket->ErrorMessage("Error WAIT_FAILED.", false);
+			break;
+		}
+		case WAIT_ABANDONED: {
+			refSocket->ErrorMessage("(WaitForSingleObject)", false);
+			refSocket->ErrorMessage("Error WAIT_ABANDONED.", false);
+			break;
+		}
+		case WAIT_OBJECT_0: {
+			char *buffer = new char[8192];
+			ZeroMemory(buffer, 8192);
+			int buflen = 0;
+			int recvlen = recv(refSocket->SckDat.mySocket, buffer + buflen, 8192 - buflen, 0);
+			if (!recvlen || recvlen == SOCKET_ERROR) {
+				char tmpErrorData[256] = "";
+				int errorcodevalue = WSAGetLastError();
+				if (recvlen == 0) {
+					sprintf_s(tmpErrorData, "Server closing socket (%ld)", errorcodevalue); //keeps returning 0 when server disconnects me.
+					refSocket->ErrorMessage(std::string(tmpErrorData), false);
+					//I want to be sure only 0 = server disconnects..
+				}
+				else {
+					if (!refSocket->SckDat.m_connected) { return; }// 0;	} //we already disconnected somewhere.
+					sprintf_s(tmpErrorData, "SOCKET_ERROR: %ld", errorcodevalue); //keeps returning 0 when server disconnects me.
+					refSocket->ErrorMessage(std::string(tmpErrorData), false);
+				}
+				refSocket->DisconnectMessage();
+				return;// 1;// SOCKET_ERROR;
+			}
+			//Build data arrival..
+			refSocket->DataArrivalMessage(buffer, recvlen); //this needs to be decrypted before sending it to the iface.
+			delete[] buffer; //clear and free our buffer.
+			break;
+		}
+		}
+		//process events delete the struct
+		//refSocket->CriticalSection.leave();
+		return;
+	}
+}
 
 
-	MessageBox(0, "Done", "Message", MB_TASKMODAL | MB_OK);
 
+
+
+
+//////////////////////////////////////
+//		Events						//
+//////////////////////////////////////
+void SecureSocket::ErrorMessage(std::string error_message, bool crit_error)
+{
+	//Call Error event.
+	if (!IsBadReadPtr((VOID*)_events.Error, sizeof(_events.Error))) {
+		_events.Error(error_message);
+	}
+	else {
+		OutputDebugString(error_message.c_str());
+	}
+	if (crit_error) { this->DisconnectMessage(); } //Disconnect after the message.
+}
+void SecureSocket::InfoMessage(std::string info_message)
+{
+	//Call Info event.
+	if (!IsBadReadPtr((VOID*)_events.Info, sizeof(_events.Info))) {
+		_events.Info(info_message);
+	}
+	else {
+		OutputDebugString(info_message.c_str());
+	}
+}
+void SecureSocket::DisconnectMessage(void)
+{
+	//if (this->are_we_connected) { CloseHandle(g_hThread); g_hThread = NULL; }
+	shutdown(this->SckDat.mySocket, SD_BOTH);
+	closesocket(this->SckDat.mySocket);
+	this->SckDat.mySocket = INVALID_SOCKET;
+	//WSACleanup();
+	this->SckDat.m_connected = false;
+	//reset the state
+	this->SckDat.m_STATE = 0x00000000;
+	//reset connected time
+	this->m_connecteddate = 0;
+	//Reset the data counters
+	this->SckDat.m_bytesout = 0;
+	this->SckDat.m_bytesin = 0;
+
+	//Call disconnect event.
+	if (!IsBadReadPtr((VOID*)_events.Disconnected, sizeof(_events.Disconnected))) {
+		_events.Disconnected(this->ServerAddress, this->port);
+	}
+	else {
+		OutputDebugString("Disconnected.");
+	}
+
+}
+void SecureSocket::DataArrivalMessage(char *buffer, int Length)
+{
+	this->SckDat.m_bytesin += Length;
+
+	if (!IsBadReadPtr((VOID*)_events.DataArrival, sizeof(_events.DataArrival))) {
+		_events.DataArrival(buffer, Length);
+	}
+	else {
+		OutputDebugString(std::string(buffer).c_str()); //should hex dump this message
+	}
 }
