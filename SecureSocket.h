@@ -6,6 +6,9 @@
 #include <winuser.h>
 #include <ws2tcpip.h>
 #define SECURITY_WIN32
+#define IO_BUFFER_SIZE  0x10000
+#define DLL_NAME TEXT("Secur32.dll")
+#define NT4_DLL_NAME TEXT("Security.dll")
 #include <SChannel.h>
 #include <security.h>
 
@@ -86,14 +89,8 @@ public:
 		// Load Security DLL
 		mod_security = LoadLibrary("Secur32.dll");
 		// Initialize Schannel
-		INIT_SECURITY_INTERFACE initsecurtyinterfacefunction = (INIT_SECURITY_INTERFACE)GetProcAddress(mod_security, "InitSecurityInterfaceA");
-		SChanDat.schannel = initsecurtyinterfacefunction();
-		if (!SChanDat.schannel) {
-			this->ErrorMessage("Failed to initialize schannel. ", true); 
-			return;
-		} else {
-			this->InfoMessage("initialized schannel. ");
-		}
+		if (!LoadSecurityModule()) { return; }
+
 		// Setup Schannel Credentials
 		ZeroMemory(&SChanDat.m_scc, sizeof(SChanDat.m_scc));
 		SetupSchannelCredentials(SChanDat.m_protocol, SChanDat.m_scc);
@@ -130,6 +127,7 @@ public:
 		mod_security = NULL;
 	}
 	
+	bool LoadSecurityModule(void);
 	void Connect(std::string serv, std::string sec_serv, UINT16 serv_port);
 	void PerformHandshake(void);
 	void StartSocketThread(void);
