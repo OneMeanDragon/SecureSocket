@@ -15,7 +15,6 @@ DWORD SecureSocket::SocketProcess(LPVOID param) { //(WorkerThread)
 
 BOOL getSysOpType(OSVERSIONINFOEX &osInfo)
 {
-	int ret = 0.0;
 	NTSTATUS(WINAPI *RtlGetVersion)(LPOSVERSIONINFOEX);
 
 	*(FARPROC*)&RtlGetVersion = GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
@@ -24,7 +23,6 @@ BOOL getSysOpType(OSVERSIONINFOEX &osInfo)
 	{
 		osInfo.dwOSVersionInfoSize = sizeof(osInfo);
 		RtlGetVersion(&osInfo);
-		ret = osInfo.dwMajorVersion;
 		return TRUE;
 	}
 	return FALSE;
