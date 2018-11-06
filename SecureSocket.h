@@ -24,6 +24,13 @@ struct SChannelData {
 	PSecurityFunctionTable schannel;
 };
 
+struct SocketDat {
+	WSADATA versioninfo;
+	SOCKET mySocket = INVALID_SOCKET;
+	BOOL m_connected = FALSE;
+	struct addrinfo *result, *ptr, hints;
+};
+
 class SecureSocket
 {
 private: 
@@ -33,12 +40,8 @@ private:
 
 	time_t m_connecteddate = NULL;
 
-	SOCKET mySocket = INVALID_SOCKET;
-	BOOL m_connected = FALSE;
-	struct addrinfo *result, *ptr, hints;
-
-
-	WSADATA versioninfo;
+	//Socket Infos
+	SocketDat SckDat;
 
 	//SChannel Infos
 	HMODULE mod_security = NULL;
@@ -52,7 +55,7 @@ public:
 	
 	SecureSocket()
 	{
-		WSAStartup(0x0202, &versioninfo);
+		WSAStartup(0x0202, &SckDat.versioninfo);
 		// Load Security DLL
 		mod_security = LoadLibrary("Secur32.dll");
 		// Initialize Schannel
