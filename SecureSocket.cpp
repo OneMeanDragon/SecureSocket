@@ -13,6 +13,79 @@ DWORD SecureSocket::SocketProcess(LPVOID param) { //(WorkerThread)
 	return 0;
 }
 
+BOOL getSysOpType(OSVERSIONINFOEX &osInfo)
+{
+	int ret = 0.0;
+	NTSTATUS(WINAPI *RtlGetVersion)(LPOSVERSIONINFOEX);
+
+	*(FARPROC*)&RtlGetVersion = GetProcAddress(GetModuleHandleA("ntdll"), "RtlGetVersion");
+
+	if (NULL != RtlGetVersion)
+	{
+		osInfo.dwOSVersionInfoSize = sizeof(osInfo);
+		RtlGetVersion(&osInfo);
+		ret = osInfo.dwMajorVersion;
+		return TRUE;
+	}
+	return FALSE;
+}
+
+bool SecureSocket::LoadSecurityModule(void)
+{
+	INIT_SECURITY_INTERFACE pInitSecurityInterface;
+	//  QUERY_CREDENTIALS_ATTRIBUTES_FN pQueryCredentialsAttributes;
+	OSVERSIONINFOEX VerInfo;
+	char lpszDLL[MAX_PATH];
+	if (!getSysOpType(VerInfo))
+	{
+		this->ErrorMessage("Could not retrieve OS Version info. ", true);
+		return false;
+	}
+
+	//  Find out which security DLL to use, depending on
+	//  whether we are on Win2K, NT or Win9x
+	//VerInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
+	//if (!GetVersionEx(&VerInfo)) return FALSE;
+
+
+	if (VerInfo.dwPlatformId == VER_PLATFORM_WIN32_NT && VerInfo.dwMajorVersion == 4)
+	{
+		strcpy_s(lpszDLL, NT4_DLL_NAME); // NT4_DLL_NAME TEXT("Security.dll")
+	}
+	else if (VerInfo.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS ||
+		VerInfo.dwPlatformId == VER_PLATFORM_WIN32_NT)
+	{
+		strcpy_s(lpszDLL, DLL_NAME); // DLL_NAME TEXT("Secur32.dll")
+	}
+	else
+	{
+		this->ErrorMessage("System not recognized. ", true);
+		return FALSE;
+	}
+
+
+	//  Load Security DLL
+	this->mod_security = LoadLibrary(lpszDLL);
+	if (this->mod_security == NULL) {
+		this->ErrorMessage("Error Loading Security Module. ", true);
+		return FALSE;
+	}
+
+	pInitSecurityInterface = (INIT_SECURITY_INTERFACE)GetProcAddress(this->mod_security, "InitSecurityInterfaceA");
+	if (pInitSecurityInterface == NULL) { 
+		this->ErrorMessage("Error reading InitSecurityInterface entry point. ", true);
+		return FALSE;
+	}
+
+	SChanDat.schannel = pInitSecurityInterface(); // call InitSecurityInterfaceA(void);
+	if (SChanDat.schannel == NULL) { 
+		this->ErrorMessage("Error reading security interface. ", true); 
+		return FALSE; 
+	}
+
+	return TRUE; // and PSecurityFunctionTable
+}
+
 void SecureSocket::SetupSchannelCredentials(UINT32 protocol, SCHANNEL_CRED &schannelcredentials)
 {
 	schannelcredentials.dwVersion = SCHANNEL_CRED_VERSION;
