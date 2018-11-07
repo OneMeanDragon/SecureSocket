@@ -182,7 +182,7 @@ void SecureSocket::PerformHandshake(void)
 	}
 
 	DWORD cbData;
-	// Send response to server if there is one.
+	// Send response to server if there is one. (Client HELLO)
 	if (SChanDat.OutBuffers[0].cbBuffer != 0 && SChanDat.OutBuffers[0].pvBuffer != NULL)
 	{
 		cbData = send(SckDat.mySocket, (const char *)SChanDat.OutBuffers[0].pvBuffer, SChanDat.OutBuffers[0].cbBuffer, 0);
