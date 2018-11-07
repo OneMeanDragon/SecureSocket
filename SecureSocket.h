@@ -87,9 +87,9 @@ public:
 	{
 		WSAStartup(0x0202, &SckDat.versioninfo);
 		// Load Security DLL
-		mod_security = LoadLibrary("Secur32.dll");
+		//mod_security = LoadLibrary("Secur32.dll");
 		// Initialize Schannel
-		if (!LoadSecurityModule()) { return; }
+		if (!LoadSecurityModule()) { return; } //ErrorMessage is within the function itself.
 
 		// Setup Schannel Credentials
 		ZeroMemory(&SChanDat.m_scc, sizeof(SChanDat.m_scc));
@@ -123,13 +123,14 @@ public:
 		WaitForSingleObject(SckDat.WorkerThread, INFINITE);
 		CloseHandle(SckDat.WorkerThread);
 		//free the library
-		FreeLibrary(mod_security);
-		mod_security = NULL;
+		UnloadSecurityLibrary();
 	}
 	
-	bool1 LoadSecurityModule(void);
+	bool LoadSecurityModule(void);
+	void UnloadSecurityLibrary(void);
 	void Connect(std::string serv, std::string sec_serv, UINT16 serv_port);
 	void PerformHandshake(void);
+	bool ClientHandshakeLoop(bool inital_read);
 	void StartSocketThread(void);
 
 	//EncryptSend
