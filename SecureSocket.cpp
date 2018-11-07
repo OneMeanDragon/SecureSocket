@@ -34,16 +34,16 @@ bool SecureSocket::LoadSecurityModule(void)
 	//  QUERY_CREDENTIALS_ATTRIBUTES_FN pQueryCredentialsAttributes;
 	OSVERSIONINFOEX VerInfo;
 	char lpszDLL[MAX_PATH];
-	if (!getSysVersionInfo(VerInfo))
-	{
-		this->ErrorMessage("Could not retrieve OS Version info. ", true);
-		return false;
-	}
 
 	//  Find out which security DLL to use, depending on
 	//  whether we are on Win2K, NT or Win9x
 	//VerInfo.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
 	//if (!GetVersionEx(&VerInfo)) return FALSE; <----------- Depreciated
+	if (!getSysVersionInfo(VerInfo))
+	{
+		this->ErrorMessage("Could not retrieve OS Version info. ", true);
+		return false;
+	}
 
 
 	if (VerInfo.dwPlatformId == VER_PLATFORM_WIN32_NT && VerInfo.dwMajorVersion == 4)
@@ -84,6 +84,12 @@ bool SecureSocket::LoadSecurityModule(void)
 	return TRUE; // and PSecurityFunctionTable
 }
 
+void SecureSocket::UnloadSecurityLibrary(void)
+{
+	FreeLibrary(this->mod_security);
+	this->mod_security = NULL;
+}
+
 void SecureSocket::SetupSchannelCredentials(UINT32 protocol, SCHANNEL_CRED &schannelcredentials)
 {
 	schannelcredentials.dwVersion = SCHANNEL_CRED_VERSION;
@@ -96,16 +102,6 @@ void SecureSocket::Connect(std::string serv, std::string sec_serv, UINT16 serv_p
 {
 	//are we trying to connect an already open socket?
 	if (this->SckDat.mySocket != INVALID_SOCKET) {
-		//clean up secure bits...
-		//
-		//clean up old socket
-		//closesocket(this->SckDat.mySocket);
-		//this->SckDat.m_connected = FALSE;
-		//this->SckDat.mySocket = INVALID_SOCKET;
-		//Re initalize the secure bits
-		//
-
-		//Or just return a message saying were already connected, force them to disconnect.
 		this->ErrorMessage("We are already connected, try disconnecting first. ", false);
 		return;
 	}
@@ -185,9 +181,37 @@ void SecureSocket::PerformHandshake(void)
 		this->InfoMessage("Security Context Initialized. ");
 	}
 
+	DWORD cbData;
+	// Send response to server if there is one.
+	if (SChanDat.OutBuffers[0].cbBuffer != 0 && SChanDat.OutBuffers[0].pvBuffer != NULL)
+	{
+		cbData = send(SckDat.mySocket, (const char *)SChanDat.OutBuffers[0].pvBuffer, SChanDat.OutBuffers[0].cbBuffer, 0);
+		if (cbData == SOCKET_ERROR || cbData == 0)
+		{
+			SChanDat.schannel->FreeContextBuffer(SChanDat.OutBuffers[0].pvBuffer);
+			SChanDat.schannel->DeleteSecurityContext(&SChanDat.contexthandle);
+			this->ErrorMessage("Error sending data to server. ", true);
+			return;
+		}
+		//printf("%d bytes of handshake data sent\n", cbData);
+		//if (_DEBUG) { 
+		//	PrintHexDump(cbData, SChanDat.OutBuffers[0].pvBuffer); 
+		//	printf("\n"); 
+		//}
+		SChanDat.schannel->FreeContextBuffer(SChanDat.OutBuffers[0].pvBuffer); // Free output buffer.
+		SChanDat.OutBuffers[0].pvBuffer = NULL;
+	}
+	//HandShakeLoop
+	if (!ClientHandshakeLoop(true)) { return; }
+
 	//need to do the handshake loop before this
 	this->InfoMessage("Starting up WorkerThread. ");
 	this->StartSocketThread();
+}
+
+bool SecureSocket::ClientHandshakeLoop(bool inital_read)
+{
+	return false;
 }
 
 void SecureSocket::StartSocketThread(void)
