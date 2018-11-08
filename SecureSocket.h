@@ -15,14 +15,15 @@
 #include <chrono>
 #include <string>
 
+#define SSPI_FLAGS (ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_RET_EXTENDED_ERROR | ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM)
+
+
 struct SChannelData {
 	UINT32 m_protocol = SP_PROT_TLS1;
 	SCHANNEL_CRED m_scc;
 	CredHandle m_cc;
-	DWORD sspiflags = (ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT | ISC_REQ_CONFIDENTIALITY | ISC_RET_EXTENDED_ERROR | ISC_REQ_ALLOCATE_MEMORY | ISC_REQ_STREAM);
 	DWORD sspioutflags;
-	SecBuffer OutBuffers[1];
-	SecBufferDesc OutBuffer;
+	SecBuffer ExtraData;
 	CtxtHandle contexthandle;
 	PSecurityFunctionTable schannel;
 };
@@ -49,13 +50,13 @@ private:
 
 	//SChannel Infos
 	HMODULE mod_security = NULL;
-	SChannelData SChanDat;
 
 	void SetupSchannelCredentials(UINT32 protocol, SCHANNEL_CRED &schannelcredentials);
 
 public: 
 	//Socket Infos
 	SocketDat SckDat; //Public for the thread
+	SChannelData SChanDat;
 
 	static DWORD WINAPI SocketProcess(LPVOID param);
 	void CALLBACK SocketAPCProcess(LPVOID param, const DWORD dwEventID);
@@ -129,10 +130,13 @@ public:
 	bool LoadSecurityModule(void);
 	void UnloadSecurityLibrary(void);
 	void Connect(std::string serv, std::string sec_serv, UINT16 serv_port);
-	void PerformHandshake(void);
-	bool ClientHandshakeLoop(bool inital_read);
+	bool PerformHandshake(SOCKET Socket, PCredHandle phCreds, SEC_CHAR *pszServerSecName, CtxtHandle *phContext, SecBuffer *pExtraData); //Client Hello.
+	bool ClientHandshakeLoop(SOCKET Socket, PCredHandle phCreds, CtxtHandle *phContext, BOOL inital_read, SecBuffer *pExtraData);
 	void StartSocketThread(void);
+	SECURITY_STATUS ReadDecrypt(SOCKET Socket, PCredHandle phCreds, CtxtHandle * phContext, char * pbIoBuffer, DWORD cbIoBufferLength);
+	DWORD EncryptSend(SOCKET Socket, CtxtHandle * phContext, char * pbIoBuffer, DWORD bufLength, SecPkgContext_StreamSizes Sizes);
 
+	void testsend();
 	//EncryptSend
 	//Recieve
 	//DecryptRecieve
