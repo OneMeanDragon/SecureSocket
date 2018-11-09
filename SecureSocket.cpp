@@ -748,9 +748,14 @@ SECURITY_STATUS SecureSocket::ReadDecrypt(SOCKET Socket, PCredHandle phCreds, Ct
 			if (length) // check if last two chars are CR LF
 			{
 				buff = (char *)pDataBuffer->pvBuffer; // printf( "n-2= %d, n-1= %d \n", buff[length-2], buff[length-1] );
-				//printf("Decrypted data: %d bytes", length); 
-				//PrintText(length, buff);
-				
+
+#ifdef _DEBUG
+				// printf( "n-2= %d, n-1= %d \n", buff[length-2], buff[length-1] );
+				char msg_debug_out[128] = "";
+				sprintf_s(msg_debug_out, "Decrypted data: %d bytes\r\n", length);
+				OutputDebugString(msg_debug_out);
+#endif
+
 				char *out_buffer = new char[length + 1]; //create the out buffter
 				ZeroMemory(out_buffer, length + 1);
 				memcpy_s(out_buffer, length, buff, length);
