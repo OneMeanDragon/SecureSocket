@@ -750,7 +750,13 @@ SECURITY_STATUS SecureSocket::ReadDecrypt(SOCKET Socket, PCredHandle phCreds, Ct
 				buff = (char *)pDataBuffer->pvBuffer; // printf( "n-2= %d, n-1= %d \n", buff[length-2], buff[length-1] );
 				//printf("Decrypted data: %d bytes", length); 
 				//PrintText(length, buff);
-				this->DataArrivalMessage(buff, length);
+				
+				char *out_buffer = new char[length + 1]; //create the out buffter
+				ZeroMemory(out_buffer, length + 1);
+				memcpy_s(out_buffer, length, buff, length);
+				this->DataArrivalMessage(out_buffer, length);
+				delete[] out_buffer; //Always delete our New's
+				
 				//if (fVerbose) { 
 				//	PrintHexDump(length, buff); 
 				//	printf("\n"); 
