@@ -400,3 +400,90 @@ DWORD UDPListener::ListenProcessx(LPVOID param) { //(WorkerThread)
 
 
 }
+
+
+
+
+------------------------------
+
+
+#pragma once
+#include <WS2tcpip.h>				//Winsock header
+#include <Windows.h>
+
+#include <string>
+
+#include "mList.h"
+
+
+
+namespace NETWORK
+{
+	//Get Ip address of HostName
+	void GetIPAddressOfHost(std::string HostNameStr, SOCKADDR_IN &addressinfo);
+
+	class UDPListener
+	{
+	private:
+		std::string m_IP = "";
+		unsigned short m_port = 0;
+
+	public:
+		HANDLE events[2];
+
+		void CALLBACK SocketAPCProcess(LPVOID param, const DWORD dwEventID);
+		static DWORD WINAPI ListenProcessx(LPVOID param);
+		static DWORD WINAPI ListenProcess(LPVOID param);
+		void StartSocketThread(void);
+
+		UDPListener();
+		~UDPListener();
+	public:
+
+		struct ReceiveOverlapped : public OVERLAPPED {
+			SOCKET Sock;
+			bool* Disconnect;
+			UINT_PTR ThisClsObj;
+		};
+		SOCKET Sock = INVALID_SOCKET;
+		bool Disconnect = false;
+
+		HANDLE WorkerThread;
+		bool running = true;
+
+
+		//PvPGN Tracker Address
+		SOCKADDR_IN TrackerAddress;
+
+
+	private:
+		int InitWinsock(void);
+		int BindUDP(SOCKET s);
+
+		static VOID WINAPI SendCompletion(DWORD dwErrorCode, DWORD dwNumberOfBytesTransferred, LPOVERLAPPED lpOverlapped);
+		static void WINAPI ReceiveCompletion(DWORD dwErrorCode, DWORD dwNumberOfBytesTransferred, ReceiveOverlapped* lpOverlapped);
+
+		void RunMainLoop();
+	public:
+
+		void SendData(SOCKET Sock, const char* Data);
+		void StartupRun(const char *ipAddy, unsigned short port);
+		void DisCon();
+
+		//Legacy challenge
+		void PKT_CONNTEST(sockaddr_in ClientAddr, unsigned int UDPKey, unsigned int Count);
+		//This message should be sent in response to either SID_LOGONCHALLENGEEX or SID_AUTH_INFO
+		void PKT_CONNTEST2(sockaddr_in ClientAddr, unsigned int ServerKey, unsigned int UDPKey, unsigned int Count);
+		//This packet contains the UDP code to be sent to Battle.net in SID_UDPPINGRESPONSE (0x14)
+		void PKT_SERVERPING(sockaddr_in ClientAddr, unsigned int UDPKey, int count);
+		//Some local shit?
+		void PKT_20(sockaddr_in ClientAddr, char bytValue);
+
+		void SendUdpToClient(unsigned char* message, unsigned int message_length, sockaddr_in ClientAddr);
+
+		virtual void UdpDataArrival(COMMON::SocketAddrEX UdpSock, const char *message, unsigned int message_length);
+		virtual void BindSuccessfull(void);
+		virtual void UDPTick(void);
+	};
+
+}
